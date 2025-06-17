@@ -1,4 +1,4 @@
-# Multi-Modal Depth Completion with Semantic Guidance
+# Multi-Modal Depth Estimation with Semantic Segmentation
 
 This project implements a DepthNet-style architecture for depth completion using RGB images, sparse LiDAR/depth maps, and semantic segmentation maps as inputs. The model is trained on the NYU Depth v2 dataset and outputs dense depth maps. This project was inspired by the DepthNet and Pix2Pix papers.
 
