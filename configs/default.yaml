@@ -1,0 +1,69 @@
+# ================================
+# DepthNet Configuration File
+# ================================
+
+# Data Configuration
+data:
+  data_dir: "./data"
+  rgb_dir: null  # Will use data_dir/images if null
+  depth_dir: null  # Will use data_dir/depths if null
+  sparse_dir: null  # Will use data_dir/labels if null
+  semseg_dir: null  # Will use data_dir/instances if null
+  image_size: [256, 256]
+  train_split: 0.9
+
+# Model Configuration
+model:
+  batch_norm: true
+  dropout: 0.2
+  depth_activation: "elu"  # Options: "elu", "none"
+  with_confidence: false
+  clamp: false
+  in_channels: 6  # RGB (3) + Sparse (1) + Semantic (2)
+
+# Training Configuration
+training:
+  epochs: 200
+  batch_size: 4
+  learning_rate: 0.0002
+  weight_decay: 0.0001
+  grad_clip: 1.0
+  seed: 42
+  num_workers: 4
+  pin_memory: true
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "cosine"  # Options: "cosine", "plateau", "none"
+    cosine:
+      eta_min: 0.000001
+    plateau:
+      factor: 0.5
+      patience: 10
+  
+  # Automatic Mixed Precision
+  amp:
+    enabled: false
+
+# Loss Configuration
+loss:
+  l1_weight: 1.0
+  gradient_weight: 0.5
+  berhu_weight: 0.0
+  scale_invariant_weight: 0.0
+  multi_scale: true
+  scale_weights: [1.0, 0.7, 0.5, 0.3, 0.2]
+
+# Output Configuration
+output:
+  output_dir: "./outputs"
+  save_every: 50  # Save checkpoint every N epochs
+  log_every: 10  # Log metrics every N batches
+  vis_every: 10  # Visualize predictions every N epochs
+
+# Inference Configuration
+inference:
+  weights: "depthnet_final.pth"
+  colormap: "plasma"
+  save_raw: false
+  save_colormap: true

@@ -45,6 +45,7 @@ This project implements a **deep learning pipeline** for monocular depth estimat
 - **Multi-scale Supervision**: Coarse-to-fine depth refinement
 - **Instance Normalization**: GroupNorm for stable training
 - **Dropout Regularization**: Prevents overfitting
+- **Advanced Loss Functions**: BerHu, Gradient, Scale-invariant losses
 
 </td>
 <td width="50%">
@@ -103,6 +104,38 @@ This project implements a **deep learning pipeline** for monocular depth estimat
 
 ---
 
+## 📂 Project Structure
+
+```
+📦 Depth-Estimation-with-Semantic-Segmentation/
+├── 📂 src/                      # Main source code package
+│   ├── 📂 models/               # Neural network architectures
+│   │   ├── depthnet.py          # DepthNet model
+│   │   └── layers.py            # Custom layers
+│   ├── 📂 data/                 # Data loading utilities
+│   │   ├── dataset.py           # Dataset classes
+│   │   └── transforms.py        # Data augmentations
+│   └── 📂 utils/                # Utility functions
+│       ├── metrics.py           # Evaluation metrics
+│       ├── losses.py            # Loss functions
+│       └── visualization.py     # Plotting utilities
+├── 📂 configs/                  # Configuration files
+│   └── default.yaml             # Default training config
+├── 📓 Model.ipynb               # Original training notebook
+├── 🐍 train.py                  # Training script
+├── 🐍 inference.py              # Inference script
+├── 🐍 model.py                  # Simple model import
+├── 📊 depthnet_final.pth        # Pre-trained weights
+├── 🖼️ output1.png               # Sample prediction 1
+├── 🖼️ output2.png               # Sample prediction 2
+├── 📐 unet_graph.png            # Architecture visualization
+├── 📋 requirements.txt          # Dependencies
+├── 📋 setup.py                  # Package installation
+└── 📖 README.md                 # This file
+```
+
+---
+
 ## 📂 Dataset
 
 <div align="center">
@@ -124,76 +157,97 @@ This project implements a **deep learning pipeline** for monocular depth estimat
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Installation
 
 ```bash
-pip install torch torchvision matplotlib pillow tqdm h5py
-```
-
-### Training
-
-```python
 # Clone the repository
-git clone https://github.com/YourUsername/Depth-Estimation-with-Semantic-Segmentation.git
+git clone https://github.com/DhruvGarg111/Depth-Estimation-with-Semantic-Segmentation.git
 cd Depth-Estimation-with-Semantic-Segmentation
 
-# Run the Jupyter notebook
-jupyter notebook Model.ipynb
+# Install dependencies
+pip install -r requirements.txt
+
+# Or install as a package
+pip install -e .
 ```
 
 ### Inference
 
 ```python
 import torch
-from model import DepthNet
+from model import DepthNet, load_pretrained
 
 # Load pre-trained model
-model = DepthNet(batch_norm=True, dropout=0.2)
-model.load_state_dict(torch.load("depthnet_final.pth"))
-model.eval()
+model = load_pretrained("depthnet_final.pth", device="cuda")
 
 # Prepare input (6 channels: RGB + Sparse Depth + Semantic)
-rgb = ...          # [B, 3, H, W]
-sparse_depth = ... # [B, 1, H, W]
-semantic = ...     # [B, 2, H, W]
+rgb = torch.randn(1, 3, 256, 256)       # [B, 3, H, W]
+sparse_depth = torch.randn(1, 1, 256, 256)  # [B, 1, H, W]
+semantic = torch.randn(1, 2, 256, 256)      # [B, 2, H, W]
 
-input_tensor = torch.cat([rgb, sparse_depth, semantic], dim=1)
+input_tensor = torch.cat([rgb, sparse_depth, semantic], dim=1).cuda()
 
 with torch.no_grad():
     predictions = model(input_tensor)
     final_depth = predictions[0]  # Finest resolution
 ```
 
----
+### Command Line Inference
 
-## 📁 Project Structure
+```bash
+# Single image inference
+python inference.py --image path/to/image.jpg --weights depthnet_final.pth
 
+# Batch inference on a directory
+python inference.py --input_dir path/to/images --weights depthnet_final.pth --output_dir results
 ```
-📦 Depth-Estimation-with-Semantic-Segmentation
-├── 📓 Model.ipynb          # Main training notebook
-├── 📊 depthnet_final.pth   # Pre-trained model weights
-├── 🖼️ output1.png          # Sample prediction 1
-├── 🖼️ output2.png          # Sample prediction 2
-├── 📐 unet_graph.png       # Architecture visualization
-├── 📋 requirements.txt     # Dependencies
-└── 📖 README.md            # This file
+
+### Training
+
+```bash
+# Train with default settings
+python train.py --data_dir ./data --epochs 200
+
+# Train with custom settings
+python train.py \
+    --data_dir ./data \
+    --epochs 500 \
+    --batch_size 8 \
+    --lr 1e-4 \
+    --amp \
+    --scheduler cosine \
+    --output_dir ./outputs
 ```
 
 ---
 
 ## 🎓 Training Details
 
-### Loss Function
+### Loss Functions
+
+The model uses a combination of loss functions for robust training:
 
 ```python
-def depth_metric_reconstruction_loss(pred, target, normalize=False):
-    """
-    Multi-scale L1 loss with optional relative normalization.
-    Supervision at multiple resolutions enables coarse-to-fine learning.
-    """
-    # Weighted sum of losses at different scales
-    # Higher weight for finer resolutions
-    pass
+from src.utils import CombinedDepthLoss
+
+criterion = CombinedDepthLoss(
+    l1_weight=1.0,           # Base L1 loss
+    gradient_weight=0.5,     # Edge-aware gradient loss
+    berhu_weight=0.0,        # Reverse Huber loss (optional)
+    multi_scale=True,        # Multi-scale supervision
+    scale_weights=[1.0, 0.7, 0.5, 0.3, 0.2]
+)
+```
+
+### Evaluation Metrics
+
+```python
+from src.utils import compute_depth_metrics
+
+metrics = compute_depth_metrics(predictions, ground_truth)
+print(f"RMSE: {metrics.rmse:.4f}")
+print(f"AbsRel: {metrics.abs_rel:.4f}")
+print(f"δ < 1.25: {metrics.delta_1:.4f}")
 ```
 
 ### Hyperparameters
@@ -204,8 +258,25 @@ def depth_metric_reconstruction_loss(pred, target, normalize=False):
 | Batch Size | 4 |
 | Learning Rate | 2e-4 |
 | Optimizer | Adam |
-| Epochs | 500 |
+| Epochs | 200-500 |
 | Dropout | 0.2 |
+| Scheduler | Cosine Annealing |
+
+---
+
+## 📈 Evaluation Metrics
+
+The model is evaluated using standard depth estimation metrics:
+
+| Metric | Description | Better |
+|:------:|:-----------:|:------:|
+| **AbsRel** | Mean absolute relative error | ↓ Lower |
+| **SqRel** | Mean squared relative error | ↓ Lower |
+| **RMSE** | Root mean squared error | ↓ Lower |
+| **RMSElog** | RMSE in log space | ↓ Lower |
+| **δ < 1.25** | % of pixels with max(pred/gt, gt/pred) < 1.25 | ↑ Higher |
+| **δ < 1.25²** | % of pixels with threshold < 1.5625 | ↑ Higher |
+| **δ < 1.25³** | % of pixels with threshold < 1.953 | ↑ Higher |
 
 ---
 
@@ -264,6 +335,7 @@ def depth_metric_reconstruction_loss(pred, target, normalize=False):
 | Improve edge sharpness | 🔜 Planned |
 | Test on outdoor scenes | 🔜 Planned |
 | Add real-time inference | 🔜 Planned |
+| ONNX/TensorRT export | 🔜 Planned |
 
 ---
 
