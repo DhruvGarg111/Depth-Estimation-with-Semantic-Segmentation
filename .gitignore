@@ -97,7 +97,7 @@ logs/
 *.mat
 *.h5
 *.hdf5
-data/
+/data/
 nyu_dataset/
 
 # Model weights (large files)
